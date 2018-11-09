@@ -8,7 +8,7 @@
 ;;   the terms of this license.
 ;;   You must not remove this notice, or any others, from this software.
 
-(defproject com.7theta/distantia "0.1.0"
+(defproject com.7theta/distantia "0.1.1"
   :description "diff and patch implementations for clojure data structures"
   :url "https://github.com/7theta/distantia"
   :license {:name "Eclipse Public License"

@@ -14,22 +14,22 @@
 
 (defn diff
   [a b]
-  {:pre [(or (and (map? a) (map? b))
-             (and (vector? a) (vector? b)))]}
   (try
     (cond
       (and (map? a) (map? b)) (map-diff a b)
-      (and (vector? a) (vector? b)) (vec-diff a b))
+      (and (vector? a) (vector? b)) (vec-diff a b)
+      :else [:r b])
     (catch #?(:clj Exception :cljs js/Error) e
       (#?(:clj println :cljs js/console.error) "diff:" (pr-str a) (pr-str b))
       (throw e))))
 
 (defn patch
-  [a p]
+  [a [type p :as patch]]
   (try
     (cond
-      (map? a) (map-patch a p)
-      (vector? a) (vec-patch a p))
+      (and (map? a) (= :m type)) (map-patch a patch)
+      (and (vector? a) (= :v type)) (vec-patch a patch)
+      (= :r type) p)
     (catch #?(:clj Exception :cljs js/Error) e
       (#?(:clj println :cljs js/console.error) "patch:" (pr-str a) (pr-str p))
       (throw e))))
@@ -63,7 +63,6 @@
 
 (defn map-patch
   [m [patch-type patch]]
-  {:pre [(= :m patch-type)]}
   (as-> m $
     (reduce (fn [m c]
               (if (= 2 (count c))
@@ -92,7 +91,6 @@
 
 (defn vec-patch
   [v [patch-type patch]]
-  {:pre [(= :v patch-type)]}
   (vec
    (:output
     (reduce (fn [{:keys [input output] :as v} [op count values]]
