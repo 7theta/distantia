@@ -18,9 +18,8 @@
     (cond
       (and (map? a) (map? b)) (map-diff a b)
       (and (vector? a) (vector? b)) (vec-diff a b)
-      :else [:r b])
+      :else [:s b])
     (catch #?(:clj Exception :cljs js/Error) e
-      (#?(:clj println :cljs js/console.error) "diff:" (pr-str a) (pr-str b))
       (throw e))))
 
 (defn patch
@@ -29,39 +28,49 @@
     (cond
       (and (map? a) (= :m type)) (map-patch a patch)
       (and (vector? a) (= :v type)) (vec-patch a patch)
-      (= :r type) p)
+      (= :s type) p)
     (catch #?(:clj Exception :cljs js/Error) e
-      (#?(:clj println :cljs js/console.error) "patch:" (pr-str a) (pr-str p))
       (throw e))))
+
+
+;;; Private
 
 (declare key-paths)
 
-(defn map-diff
+(defn- map-diff
   [x y]
-  (let [prefix? (fn [s pre] (= (take (count pre) s) pre))
-        key-paths (distinct (concat (key-paths x) (key-paths y)))]
-    [:m (reduce (fn [{:keys [a r c] :as patch} kp]
-                  (let [xv (get-in x kp ::not-found)
-                        yv (get-in y kp ::not-found)
-                        xv? (not= ::not-found xv)
-                        yv? (not= ::not-found yv)]
-                    (cond
-                      (and xv? yv? (= xv yv)) patch
-                      (and xv? yv? (vector? xv) (vector? yv)) (cond-> patch
-                                                                (->> c (map first) (not-any? (partial prefix? kp)))
-                                                                (update :c conj [kp (vec-diff xv yv) :s]))
-                      (and xv? yv?) (cond-> patch
-                                      (->> c (map first) (not-any? (partial prefix? kp)))
-                                      (update :c conj [kp yv]))
-                      xv? (cond-> patch
-                            (not-any? (partial prefix? kp) r)
-                            (update :r conj kp))
-                      yv? (cond-> patch
-                            (->> a (map first) (not-any? (partial prefix? kp)))
-                            (update :a conj [kp yv])))))
-                {:a [] :r [] :c []} key-paths)]))
+  (let [prefix? (fn [pre s] (= (take (count pre) s) pre))]
+    [:m (loop [a (transient []) r (transient []) c (transient [])
+               paths (distinct (concat (key-paths x) (key-paths y)))]
+          (if-let [kp (first paths)]
+            (let [xv (get-in x kp ::not-found)
+                  yv (get-in y kp ::not-found)
+                  xv? (not= ::not-found xv)
+                  yv? (not= ::not-found yv)]
+              (cond
+                (and xv? yv? (= xv yv))
+                (recur a r c (next paths))
 
-(defn map-patch
+                (and xv? yv? (vector? xv) (vector? yv))
+                (recur a r (conj! c [kp (vec-diff xv yv) :s])
+                       (remove (partial prefix? kp) (next paths)))
+
+                (and xv? yv?)
+                (recur a r (conj! c [kp yv])
+                       (remove (partial prefix? kp) (next paths)))
+
+                xv?
+                (recur a (conj! r kp) c
+                       (remove (partial prefix? kp) (next paths)))
+
+                yv? (recur (conj! a [kp yv]) r c
+                           (remove (partial prefix? kp) (next paths)))))
+            (cond-> {}
+              (pos? (count a)) (assoc :a (persistent! a))
+              (pos? (count r)) (assoc :r (persistent! r))
+              (pos? (count c)) (assoc :c (persistent! c)))))]))
+
+(defn- map-patch
   [m [patch-type patch]]
   (as-> m $
     (reduce (fn [m c]
@@ -79,7 +88,7 @@
 
 (declare lcs-matrix lcs-diff)
 
-(defn vec-diff
+(defn- vec-diff
   [v w]
   [:v (->> (lcs-diff (lcs-matrix v w) v w)
            (partition-by first)
@@ -89,7 +98,7 @@
                     :r [:r (count changes)]
                     :a [:a (count changes) (map second changes)]))))])
 
-(defn vec-patch
+(defn- vec-patch
   [v [patch-type patch]]
   (vec
    (:output
@@ -101,8 +110,6 @@
                 :a (-> v (update :output concat values))))
             {:input v :output []} patch))))
 
-;;; Private
-
 (defn- key-paths
   ([m] (key-paths m []))
   ([m prefix]
@@ -112,7 +119,7 @@
                  (cons kp (key-paths v kp))
                  [kp]))) m)))
 
-(defn lcs-matrix
+(defn- lcs-matrix
   [s t & {:keys [compare] :or {compare =}}]
   (let [rows (inc (count s))
         cols (inc (count t))
@@ -127,7 +134,7 @@
                          (aget a (dec i) j)))))
     a))
 
-(defn lcs-diff
+(defn- lcs-diff
   [lcs-matrix s t & {:keys [compare] :or {compare =}}]
   (let [m lcs-matrix
         f (fn lcs-diff-rec [i j]
