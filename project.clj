@@ -8,16 +8,16 @@
 ;;   the terms of this license.
 ;;   You must not remove this notice, or any others, from this software.
 
-(defproject com.7theta/distantia "0.2.0"
+(defproject com.7theta/distantia "0.2.1"
   :description "diff and patch implementations for clojure data structures"
   :url "https://github.com/7theta/distantia"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.9.0"]]
+  :dependencies [[org.clojure/clojure "1.10.0"]]
   :profiles {:dev {:global-vars {*warn-on-reflection* true}
                    :plugins [[lein-cljsbuild "1.1.7"]
                              [lein-doo "0.1.7"]]
-                   :dependencies [[org.clojure/clojurescript "1.10.339"]
+                   :dependencies [[org.clojure/clojurescript "1.10.439"]
                                   [org.clojure/tools.namespace "0.2.11"]
                                   [org.clojure/test.check "0.9.0"]
                                   [com.gfredericks/test.chuck "0.2.9"]]
